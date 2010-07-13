@@ -1,0 +1,110 @@
+#!/usr/bin/env python
+
+import os, tempfile, sys, subprocess
+
+DAEMON_ARGS = ""
+
+def bus_pid_file(bus_name):
+    return os.path.join(tempfile.gettempdir(),
+                        '%s%spid' % (bus_name, os.path.extsep))
+
+def bus_address_file(bus_name):
+    return os.path.join(tempfile.gettempdir(),
+                        '%s%saddr' % (bus_name, os.path.extsep))
+
+def get_bus_pid(bus_name):
+    if not os.path.exists(bus_pid_file(bus_name)) or \
+            not os.path.exists(bus_address_file(bus_name)):
+        return -1
+
+    pidfile = open(bus_pid_file(bus_name))
+    pid = pidfile.read().strip()
+    pidfile.close()
+
+    p = subprocess.Popen(
+        ['ps', '-p', pid ,'-o', 'cmd', 'h'], stdout=subprocess.PIPE)
+    if p.wait() != 0:
+        return -1
+
+    if 'dbus-daemon' in p.stdout.read():
+        return int(pid)
+    else:
+        return -1
+
+def launch_bus(bus_name):
+    cleanup_bus(bus_name)
+
+    bus_pid = open(bus_pid_file(bus_name), 'w')
+
+    bus_addr = open(bus_address_file(bus_name), 'w')
+
+    os.system(
+        'dbus-daemon --session --print-address=%d --print-pid=%d --fork' % \
+            (bus_addr.fileno(), bus_pid.fileno()))
+
+    bus_pid.close()
+
+    bus_addr.close()
+
+def get_bus_address(bus_name):
+    addrfile = open(bus_address_file(bus_name))
+    rv = addrfile.read().strip()
+    addrfile.close()
+    
+    print 'Bus address:', rv
+    return rv
+
+def launch_or_use_bus(bus_name):
+    if get_bus_pid(bus_name) < 0:
+        print 'Launching new bus'
+        launch_bus(bus_name)
+    else:
+        print 'Using existing bus'
+
+    return get_bus_address(bus_name)
+
+def run_command_with_address(cmd, address):
+    newenv = os.environ.copy()
+    newenv['DBUS_SESSION_BUS_ADDRESS'] = bus_address
+
+    if len(cmd) == 1:
+        cmd.append('')
+
+    cmd.append(newenv)
+
+    sys.stdout.flush()
+
+    os.execlpe(*cmd)
+
+def kill_bus(bus_name):
+    pid = get_bus_pid(bus_name)
+    if pid > 0:
+        os.kill(pid, 15)
+    
+    cleanup_bus(bus_name)
+
+def cleanup_bus(bus_name):
+    if os.path.exists(bus_pid_file(bus_name)):
+        os.remove(bus_pid_file(bus_name))
+
+    if os.path.exists(bus_address_file(bus_name)):
+        os.remove(bus_address_file(bus_name))
+    
+
+if __name__ == "__main__":
+    if '--' not in sys.argv:
+        print 'Usage: %s [bus name suffix] -- command' % sys.argv[0]
+        sys.exit(0)
+
+    try:
+        suffix = '-%s' % sys.argv[:sys.argv.index('--')][1]
+    except IndexError:
+        suffix = ''
+
+    bus_name = 'testbus-%d%s' % (os.getuid(), suffix)
+
+    newcmd = sys.argv[sys.argv.index('--') + 1:]
+    
+    bus_address = launch_or_use_bus(bus_name)
+
+    run_command_with_address(newcmd, bus_address)
