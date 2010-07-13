@@ -68,7 +68,10 @@ def launch_or_use_bus(bus_name):
 
 def run_command_with_address(cmd, address):
     newenv = os.environ.copy()
+
     newenv['DBUS_SESSION_BUS_ADDRESS'] = bus_address
+
+    newenv['TESTING_DBUS'] = 'yes'
 
     if len(cmd) == 1:
         cmd.append('')
