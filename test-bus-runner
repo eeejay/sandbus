@@ -53,7 +53,7 @@ def get_bus_address(bus_name):
     addrfile = open(bus_address_file(bus_name))
     rv = addrfile.read().strip()
     addrfile.close()
-    
+
     print 'Bus address:', rv
     return rv
 
@@ -83,7 +83,7 @@ def kill_bus(bus_name):
     pid = get_bus_pid(bus_name)
     if pid > 0:
         os.kill(pid, 15)
-    
+
     cleanup_bus(bus_name)
 
 def cleanup_bus(bus_name):
@@ -92,7 +92,7 @@ def cleanup_bus(bus_name):
 
     if os.path.exists(bus_address_file(bus_name)):
         os.remove(bus_address_file(bus_name))
-    
+
 
 if __name__ == "__main__":
     from optparse import OptionParser
