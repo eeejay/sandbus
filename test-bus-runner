@@ -21,6 +21,9 @@ def get_bus_pid(bus_name):
     pid = pidfile.read().strip()
     pidfile.close()
 
+    if not pid:
+        return -1
+
     p = subprocess.Popen(
         ['ps', '-p', pid ,'-o', 'cmd', 'h'], stdout=subprocess.PIPE)
     if p.wait() != 0:
@@ -92,19 +95,26 @@ def cleanup_bus(bus_name):
     
 
 if __name__ == "__main__":
-    if '--' not in sys.argv:
-        print 'Usage: %s [bus name suffix] -- command' % sys.argv[0]
-        sys.exit(0)
+    from optparse import OptionParser
 
-    try:
-        suffix = '-%s' % sys.argv[:sys.argv.index('--')][1]
-    except IndexError:
+    usage = "usage: %prog [options] arg1 arg2"
+    parser = OptionParser(usage=usage)
+    parser.add_option("-k", "--kill",
+                      action="store_true", dest="kill", default=False,
+                      help="kill the default or given bus")
+    parser.add_option("-b", "--bus-name", dest="busname",
+                      help="the name of bus to use", default='')
+    (options, newcmd) = parser.parse_args()
+
+    if options.busname:
+        suffix = '-%s' % options.busname
+    else:
         suffix = ''
 
     bus_name = 'testbus-%d%s' % (os.getuid(), suffix)
 
-    newcmd = sys.argv[sys.argv.index('--') + 1:]
-    
-    bus_address = launch_or_use_bus(bus_name)
-
-    run_command_with_address(newcmd, bus_address)
+    if options.kill:
+        kill_bus(bus_name)
+    else:
+        bus_address = launch_or_use_bus(bus_name)
+        run_command_with_address(newcmd, bus_address)
